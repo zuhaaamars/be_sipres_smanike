@@ -1,4 +1,4 @@
-from app import create_app, db
+from app.app import create_app, db
 # Import Model Autentikasi & Profile
 from app.models.user_models import User
 from app.models.admin_models import Admin

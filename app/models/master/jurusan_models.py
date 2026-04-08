@@ -1,4 +1,4 @@
-from app import db
+from app.app import db
 
 class Jurusan(db.Model):
     __tablename__ = 'master_jurusan'
