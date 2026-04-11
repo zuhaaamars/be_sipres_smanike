@@ -82,6 +82,7 @@ def register_user():
 
         # Data Kolektif (Sesuai model yang sudah diseragamkan kolom dasarnya)
         # Di dalam fungsi register_user, bagian common_fields
+        # Data Kolektif dasar
         common_fields = {
             "user_id": new_user.id,
             "nama_lengkap": data.get('nama_lengkap'),
@@ -89,17 +90,17 @@ def register_user():
             "tanggal_lahir": tgl_obj,
             "jenis_kelamin": data.get('jenis_kelamin'),
             "alamat": data.get('alamat'),
-            # UBAH BARIS DI BAWAH INI:
-            "no_telp_ortu": data.get('no_hp')  # Ambil 'no_hp' dari React, simpan ke 'no_telp_ortu' di DB
         }
 
         profile = None
 
-        # Routing pembuatan profil kosong berdasarkan Role
+        # Routing pembuatan profil berdasarkan Role
         if role == 'siswa':
-            profile = Siswa(**common_fields, nisn=None, kelas_id=None, jurusan_id=None)
+            # Siswa menggunakan no_telp_ortu
+            profile = Siswa(**common_fields, no_telp_ortu=data.get('no_telp_ortu'), nisn=None)
         elif role == 'guru':
-            profile = Guru(**common_fields, nip=None, gelar=data.get('gelar'))
+            # Guru menggunakan no_hp (Sesuai model Guru kamu)
+            profile = Guru(**common_fields, no_hp=data.get('no_hp'), nip=None, gelar=data.get('gelar'))
         elif role in ['staf', 'staff']:
             profile = Staf(**common_fields, nip=None, bagian=None)
         elif role == 'kepsek':
@@ -150,17 +151,27 @@ def update_siswa_profile():
 # --- Update Lanjutan Guru ---
 def update_guru_profile():
     data = request.get_json()
-    user_id = data.get('userId')
+    user_id = data.get('userId') # Pastikan key ini sama dengan di React
+    
     try:
         guru = Guru.query.filter_by(user_id=user_id).first()
-        if not guru: return jsonify({"status": "error", "message": "Data guru tidak ditemukan"}), 404
+        if not guru:
+            return jsonify({"status": "error", "message": "Data guru tidak ditemukan"}), 404
         
+        # Update kolom spesifik yang dikirim dari form revisi
         guru.nip = data.get('nip')
         guru.gelar = data.get('gelar')
+        guru.no_hp = data.get('no_hp')
+        
+        # Jika kamu menambahkan mapel_utama tadi:
+        # guru.mapel_utama = data.get('mapel_utama')
+        
         db.session.commit()
         return jsonify({"status": "success", "message": "Profil Guru Berhasil Dilengkapi!"}), 200
+        
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        db.session.rollback()
+        return jsonify({"status": "error", "message": f"Server Error: {str(e)}"}), 500
 
 # --- Update Lanjutan Staf ---
 def update_staf_profile():

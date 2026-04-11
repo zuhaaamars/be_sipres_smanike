@@ -1,6 +1,7 @@
 import os
 import base64
 import uuid
+from sqlalchemy import and_
 from flask import request, jsonify
 from datetime import datetime
 from app.app import db
@@ -98,3 +99,58 @@ def get_riwayat_presensi(siswa_id):
         return jsonify({"status": "success", "data": output}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+# REKAP GURU
+def get_rekap_harian_guru():
+    try:
+        from app.models.siswa_models import Siswa
+        from app.models.user_models import User
+        from app.models.master.kelas_models import Kelas
+
+        # PERBAIKAN: Kita ambil nama_lengkap dari model Siswa, bukan User
+        results = db.session.query(
+            PresensiHarian.tanggal,
+            Siswa.nisn,
+            Siswa.nama_lengkap, # Diubah: Siswa punya attribute nama_lengkap
+            Kelas.nama_kelas,
+            PresensiHarian.jam_masuk,
+            PresensiHarian.jam_pulang,
+            PresensiHarian.status,
+            PresensiHarian.foto_bukti,
+            PresensiHarian.latitude,
+            PresensiHarian.id
+        ).join(Siswa, PresensiHarian.siswa_id == Siswa.id)\
+         .join(Kelas, Siswa.kelas_id == Kelas.id)\
+         .order_by(PresensiHarian.tanggal.desc(), PresensiHarian.jam_masuk.desc())\
+         .all()
+
+        output = []
+        for r in results:
+            # Format tanggal Indonesia sederhana
+            tgl_indo = r.tanggal.strftime('%d/%m/%y') if r.tanggal else "-"
+            
+            # Bersihkan path foto agar tidak error di browser
+            foto_url = None
+            if r.foto_bukti:
+                foto_clean = r.foto_bukti.replace('\\', '/')
+                foto_url = f"http://localhost:5000/{foto_clean}"
+
+            output.append({
+                "id": r.id,
+                "nis": r.nisn or "-",
+                "nama": r.nama_lengkap, # Sekarang mengambil data yang benar
+                "kelas": f"{r.nama_kelas} ({tgl_indo})", 
+                "waktuMasuk": r.jam_masuk.strftime('%H:%M') if r.jam_masuk else "-",
+                "waktuPulang": r.jam_pulang.strftime('%H:%M') if r.jam_pulang else "-",
+                "status": r.status if r.status else "Hadir",
+                "foto": foto_url,
+                "jarak": "Terdeteksi" if r.latitude else "-",
+                "wa": "Terkirim" if r.jam_masuk else "Pending",
+                "validated": True if r.status == "Hadir" else False
+            })
+
+        return jsonify({"status": "success", "data": output}), 200
+    except Exception as e:
+        # Print error ke terminal Flask agar kamu bisa lihat detailnya
+        print(f"Error pada Rekap Guru: {str(e)}")
+        return jsonify({"status": "error", "message": f"Server Error: {str(e)}"}), 500
